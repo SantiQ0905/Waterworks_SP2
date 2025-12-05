@@ -1,0 +1,298 @@
+================================================================================
+WATERWORKS NETWORK ANALYSIS - ALGORITHMS DOCUMENTATION
+================================================================================
+
+This document outlines the algorithms used in each section of the waterworks
+network analysis project, along with the rationale for selecting each algorithm.
+
+================================================================================
+SECTION 1: GRAPH FILE PARSING
+================================================================================
+
+ALGORITHM: Sequential File Reading & Parsing
+- Custom parser that reads structured text files section by section
+- Uses state machine approach to handle different sections ([NODES], [EDGES],
+  [OFFICE], [NEW])
+
+RATIONALE:
+- Simple and efficient for structured input files
+- No complex algorithm needed; straightforward data extraction
+- Allows flexibility in file format with section-based parsing
+- Time complexity: O(n + m) where n = nodes, m = edges
+
+
+================================================================================
+SECTION 2: PIPE LENGTH CALCULATION
+================================================================================
+
+ALGORITHM: Euclidean Distance Formula
+- Formula: sqrt((x2-x1)^2 + (y2-y1)^2)
+- Applied to compute physical pipe lengths between connected nodes
+
+RATIONALE:
+- Represents real-world physical distance in 2D plane
+- Accurate for planar network layouts (typical for water distribution systems)
+- Simple, fast computation: O(1) per edge
+- Standard geometric calculation for coordinate-based graphs
+- Total complexity: O(m) where m = number of edges
+
+
+================================================================================
+SECTION 3: NETWORK SECTORIZATION
+================================================================================
+
+ALGORITHM: Multi-Source Dijkstra's Algorithm
+- Single-source shortest path algorithm extended to multiple sources
+- All pumps (sources) initialized with distance 0
+- Propagates distances simultaneously from all pumps
+- Uses priority queue (min-heap) for efficient node selection
+- Includes tie-breaking mechanism (prefer lower pump ID) for balanced sectors
+
+IMPLEMENTATION DETAILS:
+- Priority queue stores: (distance, pump_id, node_id)
+- Nodes assigned to nearest pump based on shortest path distance
+- Undirected graph traversal
+- Time complexity: O((n + m) log n) using binary heap
+
+RATIONALE:
+- OPTIMAL for finding shortest paths from multiple sources simultaneously
+- Creates balanced sectors by assigning each node to its nearest pump
+- Guarantees minimum total pipeline distance within sectors
+- Efficient for sparse graphs (typical in water networks)
+- Tie-breaking ensures deterministic, balanced sector assignment
+- Better than alternatives:
+  * BFS: Would only work for unweighted graphs (not suitable for varying
+    pipe lengths)
+  * Bellman-Ford: O(nm) is slower, unnecessary (no negative weights)
+  * Floyd-Warshall: O(n^3) is overkill for this problem
+  * Greedy assignment: Would not guarantee optimal distance-based sectors
+
+KEY OUTPUT:
+- Identifies pipes to close (edges connecting different sectors)
+- Assigns each node to a sector/pump
+- Computes distances from each node to its assigned pump
+
+
+================================================================================
+SECTION 4: WATER FRESHNESS CALCULATION
+================================================================================
+
+ALGORITHM: Linear Decay Function
+- Formula: freshness = max(0, (1 - decay_rate) * distance)
+- Uses distances computed from Section 3 (Dijkstra)
+- Identifies "sink" nodes (farthest node in each sector)
+
+RATIONALE:
+- Simple model for water quality degradation over distance
+- Assumes linear relationship between distance and freshness loss
+- Computationally efficient: O(n)
+- Decay rate parameter allows calibration to real-world data
+- Sink identification is straightforward: max distance per sector
+- Alternative models (exponential decay) would be more complex without
+  significant practical benefit for this analysis
+
+
+================================================================================
+SECTION 5: MAXIMUM FLOW CALCULATION
+================================================================================
+
+ALGORITHM: Ford-Fulkerson Method (Edmonds-Karp Implementation)
+- Uses BFS to find augmenting paths (Edmonds-Karp variant)
+- Computes maximum flow from each pump to its sink node
+- Implements residual graph with forward/backward edges
+- Edge capacities based on pipe weights from input data
+
+IMPLEMENTATION DETAILS:
+- BFS finds shortest augmenting path in residual graph
+- Bottleneck capacity determined along each path
+- Residual capacities updated after each augmentation
+- Terminates when no augmenting path exists
+- Time complexity: O(nm^2) where n = nodes, m = edges
+
+RATIONALE:
+- OPTIMAL for computing maximum flow in a network
+- Critical for water distribution: determines maximum water delivery capacity
+- Edmonds-Karp (BFS variant) ensures polynomial time complexity
+- Better than alternatives:
+  * Dinic's algorithm: More complex, unnecessary for small networks
+  * Push-relabel: Higher complexity for implementation
+  * DFS-based Ford-Fulkerson: Can have exponential time in worst case
+
+- Edmonds-Karp advantages:
+  * Guaranteed O(nm^2) performance
+  * Simpler to implement than advanced flow algorithms
+  * Efficient for networks of this size (typically < 100 nodes)
+  * Uses shortest paths (BFS), which often converges faster in practice
+
+KEY OUTPUT:
+- Maximum water flow capacity from each pump to its farthest point (sink)
+- Identifies bottleneck pipes in the network
+- Validates network capacity constraints
+
+
+================================================================================
+SECTION 6: WATER QUALITY SAMPLING ROUTE
+================================================================================
+
+ALGORITHMS:
+1. Floyd-Warshall Algorithm (All-Pairs Shortest Paths)
+2. Nearest Neighbor Heuristic (TSP Construction)
+3. 2-Opt Local Search (TSP Improvement)
+
+ALGORITHM DETAILS:
+
+A) Floyd-Warshall Algorithm:
+   - Computes shortest paths between all pairs of nodes
+   - Dynamic programming approach
+   - Time complexity: O(n^3)
+   - Creates distance matrix for TSP solver
+
+B) Nearest Neighbor Heuristic:
+   - Greedy construction: start at office, repeatedly visit nearest unvisited node
+   - Time complexity: O(n^2)
+   - Provides initial tour (typically 15-25% above optimal)
+
+C) 2-Opt Improvement:
+   - Local search: iteratively removes crossing edges
+   - Tests edge swap improvements until local optimum
+   - Time complexity: O(n^2) per iteration, typically few iterations
+   - Improves tour quality significantly (typically within 5-10% of optimal)
+
+OVERALL PROBLEM: Traveling Salesman Problem (TSP)
+
+RATIONALE:
+- TSP is the CORRECT model for sampling route optimization:
+  * Visit all nodes exactly once
+  * Minimize total travel distance
+  * Return to starting point (office)
+
+- Floyd-Warshall chosen because:
+  * Provides exact shortest paths between all node pairs
+  * Necessary for TSP solvers to work on general graphs
+  * One-time computation: O(n^3) is acceptable for n < 100
+  * Alternative (Dijkstra n times): O(n^2 m log n) - similar complexity
+
+- Nearest Neighbor chosen because:
+  * Fast construction heuristic
+  * Guarantees a valid tour
+  * Good starting point for improvement
+  * Simple to implement and understand
+
+- 2-Opt chosen for improvement because:
+  * Effective local search method
+  * Significant improvement over nearest neighbor
+  * Fast convergence for small-medium instances
+  * Good balance of quality vs. complexity
+
+- Why not exact TSP algorithms?
+  * Held-Karp (dynamic programming): O(n^2 * 2^n) - exponential, impractical
+  * Branch-and-bound: Complex, overkill for small instances
+  * Concorde/LKH: External dependencies, unnecessary complexity
+
+- Why not other metaheuristics?
+  * Genetic algorithms: More complex, slower, similar quality
+  * Simulated annealing: Similar quality, more parameters to tune
+  * Ant colony: Overkill for this problem size
+
+- The Nearest Neighbor + 2-Opt combination:
+  * Achieves near-optimal results for networks of this size
+  * Runs in reasonable time: O(n^3) dominated by Floyd-Warshall
+  * Proven effective in practice for routing problems
+  * Industry-standard approach for small TSP instances
+
+
+================================================================================
+SECTION 7: NETWORK EXPANSION
+================================================================================
+
+ALGORITHM: Incremental Graph Update with Nearest Neighbor Search
+- Greedy connection: connect new node to nearest existing non-pump node
+- Euclidean distance for neighbor search
+- Incremental updates to sector assignments and distances
+- Local sink updates (check if new node is farther than current sink)
+
+IMPLEMENTATION DETAILS:
+- Nearest neighbor search: O(n) per new node
+- Sector assignment: inherit from connected neighbor
+- Distance update: parent_distance + connection_length
+- No full recomputation of Dijkstra (efficient incremental approach)
+
+RATIONALE:
+- EFFICIENT incremental update strategy
+- Avoids full re-sectorization (would be O((n+m) log n))
+- Greedy nearest-neighbor connection makes physical sense:
+  * Minimizes new pipe length (construction cost)
+  * Likely connects to nearby infrastructure
+  * Practical constraint in real water networks
+
+- Sector inheritance is valid because:
+  * New node inherits parent's sector
+  * Connection adds one edge to existing sector
+  * Maintains sector connectivity
+
+- Why not full recomputation?
+  * Section 7 spec allows incremental updates
+  * O(n) per node vs O((n+m) log n) for full Dijkstra
+  * For k new nodes: O(kn) vs O((n+k+m) log(n+k))
+  * Trade-off: speed vs. global optimality
+
+- Why nearest non-pump node?
+  * Pumps are source nodes (should not be expanded from)
+  * Regular nodes represent natural connection points
+  * Maintains network structure integrity
+
+LIMITATIONS:
+- May not produce globally optimal sectorization
+- New nodes might theoretically be closer to a different pump
+- Acceptable trade-off for efficiency per problem requirements
+
+
+================================================================================
+COMPLEXITY SUMMARY
+================================================================================
+
+Section | Algorithm                  | Time Complexity    | Space Complexity
+--------|----------------------------|-------------------|------------------
+1       | File Parsing               | O(n + m)          | O(n + m)
+2       | Euclidean Distance         | O(m)              | O(1)
+3       | Multi-Source Dijkstra      | O((n+m) log n)    | O(n + m)
+4       | Linear Decay               | O(n)              | O(n)
+5       | Edmonds-Karp (BFS)         | O(nm^2)           | O(n + m)
+6       | Floyd-Warshall + TSP       | O(n^3)            | O(n^2)
+7       | Incremental Update         | O(kn)             | O(n + m)
+
+where: n = nodes, m = edges, k = new nodes
+
+Overall program complexity: O(n^3) dominated by Floyd-Warshall in Section 6
+
+
+================================================================================
+ALGORITHM SELECTION PRINCIPLES
+================================================================================
+
+Throughout this project, algorithms were selected based on:
+
+1. CORRECTNESS
+   - Each algorithm provably solves its assigned problem
+   - Well-established algorithms with known properties
+
+2. EFFICIENCY
+   - Polynomial time complexity for all sections
+   - Appropriate for typical water network sizes (10-1000 nodes)
+   - Avoided exponential-time exact algorithms where heuristics suffice
+
+3. PRACTICAL APPLICABILITY
+   - Algorithms model real-world water network constraints
+   - Results are actionable for network operators
+   - Balance between optimality and computational cost
+
+4. IMPLEMENTATION SIMPLICITY
+   - Standard algorithms with clear pseudocode
+   - Maintainable code without external dependencies
+   - Easy to validate and debug
+
+5. INDUSTRY STANDARDS
+   - Dijkstra for shortest paths (universal standard)
+   - Ford-Fulkerson for max flow (network flow standard)
+   - 2-opt for TSP (routing standard)
+   - Proven methods used in similar applications
