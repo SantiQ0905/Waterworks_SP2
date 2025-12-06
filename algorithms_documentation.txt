@@ -439,3 +439,337 @@ Throughout this project, algorithms were selected based on:
    - Ford-Fulkerson for max flow (network flow standard)
    - 2-opt for TSP (routing standard in logistics)
    - Proven methods used in similar real-world applications
+
+
+================================================================================
+ALTERNATIVE ALGORITHMS CONSIDERED AND REJECTED
+================================================================================
+
+SECTION 3 - SECTORIZATION:
+
+Alternative: K-means Clustering
+Rejected because:
+- Ignores network topology, only uses geometric coordinates
+- Doesn't account for connectivity constraints
+- May assign nodes to unreachable pumps
+- Optimal for spatial clustering, wrong for network distance
+
+Alternative: Spectral Clustering
+Rejected because:
+- More complex implementation (requires eigenvalue computation)
+- Similar results to Dijkstra-based approach
+- Higher computational cost: O(n³) for eigendecomposition
+- Less interpretable results
+
+Alternative: Bellman-Ford Algorithm
+Rejected because:
+- Time complexity O(nm) is slower than Dijkstra's O((n+m) log n)
+- Unnecessary since edge weights (pipe lengths) are always positive
+- Only needed when negative weights are possible
+
+
+SECTION 4 - SINK IDENTIFICATION:
+
+Alternative: Maintain Max-Heap per Sector
+Rejected because:
+- Overkill for one-time maximum finding
+- O(n log n) construction vs O(n) linear scan
+- Additional space complexity O(n)
+- Only beneficial for repeated queries
+
+Alternative: Sort and Take Last Element
+Rejected because:
+- O(n log n) sorting vs O(n) linear scan
+- Unnecessary overhead
+- Less clear intent than explicit maximum search
+
+
+SECTION 5 - MAXIMUM FLOW:
+
+Alternative: Push-Relabel Algorithm
+Rejected because:
+- More complex implementation with height functions
+- Similar worst-case complexity O(n²m)
+- No practical advantage for small networks
+- Harder to understand and debug
+
+Alternative: Dinic's Algorithm
+Rejected because:
+- Better asymptotic complexity O(n²m) vs Edmonds-Karp O(nm²)
+- More complex with blocking flows concept
+- Minimal practical benefit for networks with n < 1000
+- Implementation complexity not justified
+
+Alternative: Capacity Scaling Ford-Fulkerson
+Rejected because:
+- Adds implementation complexity
+- Requires integer capacities (may not hold with floating point)
+- No significant benefit for small networks
+
+
+SECTION 6 - TSP:
+
+Alternative: Christofides Algorithm
+Rejected because:
+- Guarantees 3/2-approximation but more complex
+- Requires perfect matching solver (Blossom algorithm)
+- 2-opt often achieves similar or better results in practice
+- Implementation complexity not justified for small instances
+
+Alternative: Lin-Kernighan Heuristic
+Rejected because:
+- Significantly more complex than 2-opt
+- Requires external libraries or complex implementation
+- Marginal improvement over 2-opt for small instances
+- Not worth implementation effort
+
+Alternative: Held-Karp Dynamic Programming
+Rejected because:
+- Exact algorithm with O(n² × 2^n) exponential complexity
+- Impractical for n > 20
+- Unnecessary when heuristics achieve near-optimal solutions
+
+Alternative: Genetic Algorithm
+Rejected because:
+- More complex with many parameters (population, mutation, crossover)
+- Stochastic, less reproducible
+- Slower convergence than local search
+- Similar solution quality to 2-opt
+
+Alternative: Simulated Annealing
+Rejected because:
+- Requires careful parameter tuning (temperature schedule)
+- Stochastic nature reduces reproducibility
+- Similar quality to 2-opt
+- More complex implementation
+
+Alternative: Multiple Fragment Heuristic
+Rejected because:
+- More complex than nearest neighbor
+- Similar construction quality
+- Less intuitive
+
+
+SECTION 7 - EXPANSION:
+
+Alternative: Full Re-sectorization with Dijkstra
+Rejected because:
+- Computationally expensive: O((n+k+m) log(n+k)) vs O(kn)
+- Overkill for single-node additions
+- Acceptable for major network restructuring
+- Incremental approach sufficient for spec requirements
+
+Alternative: Steiner Tree for Optimal Connection
+Rejected because:
+- NP-hard problem, exponential time
+- Overkill for connecting single nodes
+- Relevant for multi-node network design
+- Greedy nearest neighbor is practical approximation
+
+Alternative: Connect to Random Existing Node
+Rejected because:
+- No optimization objective
+- May create impractically long pipes
+- Ignores cost considerations
+- Poor solution quality
+
+
+================================================================================
+CONNECTIONS BETWEEN SECTIONS
+================================================================================
+
+The algorithms in this project form a pipeline where outputs feed into
+subsequent sections:
+
+SECTION 1 → SECTION 2:
+- Parsed graph structure needed for length computation
+- Node coordinates and edge list are inputs to distance calculation
+
+SECTION 2 → SECTION 3:
+- Pipe lengths become edge weights for Dijkstra's algorithm
+- Physical distances ensure realistic sectorization
+
+SECTION 3 → SECTION 4:
+- Distance dictionary from Dijkstra used to find maximum
+- Sector groupings define scope for sink search
+- Each sink is found within its sector
+
+SECTION 4 → SECTION 5:
+- Sink nodes become flow targets
+- Maximum flow computed from each pump to its sink
+- Validates network capacity from source to farthest point
+
+SECTION 3 → SECTION 6:
+- All node positions needed for TSP
+- Office location from Section 1 is starting point
+- Distances used to build all-pairs shortest path matrix
+
+SECTION 7 → SECTIONS 3, 4, 5, 6:
+- Network expansion requires updating all previous results
+- Incremental updates avoid full recomputation where possible
+- Section 6 (TSP) requires full recomputation with new nodes
+
+
+================================================================================
+PRACTICAL APPLICATIONS
+================================================================================
+
+These algorithms solve real problems in water distribution management:
+
+SECTORIZATION (Section 3):
+- Divide network into manageable zones
+- Isolate contamination events
+- Balance water pressure across zones
+- Enable zone-based maintenance
+
+SINK IDENTIFICATION (Section 4):
+- Locate points with oldest water (quality monitoring priority)
+- Identify pressure problem areas
+- Plan sensor placement for monitoring systems
+
+MAXIMUM FLOW (Section 5):
+- Validate network meets demand capacity
+- Identify bottleneck pipes for upgrades
+- Plan for peak demand scenarios
+- Ensure fire flow requirements
+
+SAMPLING ROUTE (Section 6):
+- Optimize water quality testing routes
+- Minimize technician travel time and cost
+- Regular compliance monitoring
+- Emergency contamination surveys
+
+NETWORK EXPANSION (Section 7):
+- Plan new development connections
+- Evaluate expansion scenarios
+- Maintain network coherence as city grows
+- Efficient "what-if" analysis
+
+
+================================================================================
+REFERENCES & FURTHER READING
+================================================================================
+
+FOUNDATIONAL ALGORITHMS:
+
+1. Dijkstra's Algorithm:
+   - Dijkstra, E. W. (1959). "A note on two problems in connexion with graphs"
+     Numerische Mathematik, 1: 269-271
+
+2. Ford-Fulkerson / Edmonds-Karp:
+   - Ford, L. R.; Fulkerson, D. R. (1956). "Maximal flow through a network"
+     Canadian Journal of Mathematics, 8: 399-404
+   - Edmonds, J.; Karp, R. M. (1972). "Theoretical improvements in algorithmic
+     efficiency for network flow problems"
+     Journal of the ACM, 19(2): 248-264
+
+3. Floyd-Warshall Algorithm:
+   - Floyd, Robert W. (1962). "Algorithm 97: Shortest Path"
+     Communications of the ACM, 5(6): 345
+   - Warshall, Stephen (1962). "A theorem on Boolean matrices"
+     Journal of the ACM, 9(1): 11-12
+
+TSP HEURISTICS:
+
+4. Nearest Neighbor and Analysis:
+   - Rosenkrantz, D. J.; Stearns, R. E.; Lewis, P. M. (1977)
+     "An analysis of several heuristics for the traveling salesman problem"
+     SIAM Journal on Computing, 6(3): 563-581
+
+5. 2-Opt and k-Opt Improvements:
+   - Croes, G. A. (1958). "A method for solving traveling salesman problems"
+     Operations Research, 6: 791-812
+   - Lin, S.; Kernighan, B. W. (1973). "An Effective Heuristic Algorithm for
+     the Traveling-Salesman Problem"
+     Operations Research, 21(2): 498-516
+
+WATER DISTRIBUTION NETWORKS:
+
+6. Network Sectorization:
+   - Di Nardo, A.; Di Natale, M. (2011). "A heuristic design support
+     methodology based on graph theory for district metering of water
+     supply networks"
+     Engineering Optimization, 43(2): 193-211
+
+7. Water Quality Modeling:
+   - Rossman, L. A. (2000). "EPANET 2 Users Manual"
+     U.S. Environmental Protection Agency
+
+8. Network Design and Optimization:
+   - Todini, E. (2000). "Looped water distribution networks design using a
+     resilience index based heuristic approach"
+     Urban Water, 2(2): 115-122
+   - Walski, T. M. (1984). "Analysis of Water Distribution Systems"
+     Van Nostrand Reinhold
+
+TEXTBOOKS:
+
+9. Algorithm Design:
+   - Cormen, T. H.; Leiserson, C. E.; Rivest, R. L.; Stein, C. (2009)
+     "Introduction to Algorithms" (3rd ed.)
+     MIT Press
+
+10. Network Flows:
+    - Ahuja, R. K.; Magnanti, T. L.; Orlin, J. B. (1993)
+      "Network Flows: Theory, Algorithms, and Applications"
+      Prentice Hall
+
+
+================================================================================
+NOTES ON IMPLEMENTATION
+================================================================================
+
+KEY IMPLEMENTATION DECISIONS:
+
+1. HEAPQ for Priority Queue (Section 3):
+   - Python's built-in heapq provides min-heap
+   - Efficient O(log n) push/pop operations
+   - No external dependencies
+
+2. Collections.deque for BFS (Section 5):
+   - Efficient O(1) append and popleft
+   - Better than list for queue operations
+   - Standard library, no dependencies
+
+3. 2D List for Capacity Matrix (Section 5):
+   - Simple, clear implementation
+   - Acceptable memory for n < 1000
+   - Could use sparse matrix for larger networks
+
+4. Dictionary for Graph Representation (Section 3):
+   - Adjacency list using dict of lists
+   - Memory efficient for sparse graphs
+   - O(1) average case lookup
+
+5. Floating Point for Distances/Capacities:
+   - Handles real-world measurements
+   - May have precision issues in flow algorithms
+   - Consider decimal module for production systems
+
+
+POTENTIAL IMPROVEMENTS:
+
+1. Section 3: Priority queue with decrease-key operation
+   - Fibonacci heap: O(n log n + m) vs O((n+m) log n)
+   - Complex implementation, minimal practical benefit
+   - Standard heapq is sufficient
+
+2. Section 5: Sparse capacity matrix
+   - Use adjacency list instead of 2D array
+   - Reduces space from O(n²) to O(m)
+   - Worthwhile for very large, sparse networks
+
+3. Section 6: 3-opt or LKH for better TSP solutions
+   - Marginal improvement in solution quality
+   - Significant increase in complexity
+   - Current 2-opt is adequate for this application
+
+4. Section 7: Batch insertion optimization
+   - Process multiple new nodes together
+   - Reduce redundant computations
+   - Run full Dijkstra once instead of incremental updates
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================
